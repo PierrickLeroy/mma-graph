@@ -7,3 +7,4 @@ Applying network science to UFC match records
 # Cool things to try
 - find cluster according to weight categories and time
 - create a dynamic ranking of fighters based on strength of their opponents
+![Alt text](images/mmagraph_github.png)
