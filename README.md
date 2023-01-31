@@ -11,3 +11,5 @@ Applying network science to UFC match records
 # Visualisation
 
 ![Alt text](images/mmagraph_github.png)
+
+On the picture above, the size of the node reflects the number of bouts a fighter has participated in. The C shape obtained with Force Atlas is a manifestation of some fighters fighting in different categories hence through attraction making the whole structure fold a bit. You can see some of these fighter if you look carefully. The network of women is logically disconnected from the men's.
