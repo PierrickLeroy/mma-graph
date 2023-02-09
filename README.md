@@ -1,3 +1,5 @@
+![PyTorch](https://img.shields.io/badge/PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
+
 # Data
 UFC-Fight historical data from 1993 to 2021 (available at https://www.kaggle.com/datasets/rajeevw/ufcdata)
 - Compiled UFC fight, fighter stats and information
