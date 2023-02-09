@@ -1,15 +1,24 @@
-# mma-graph
-Applying network science to UFC match records
-
 # Data
-- recap of fights : 6K rows and 150 columns describing every fight in UFC during a decades long year span
+UFC-Fight historical data from 1993 to 2021 (available at https://www.kaggle.com/datasets/rajeevw/ufcdata)
+- Compiled UFC fight, fighter stats and information
+- 144 columns and 6K rows with information about fighters characteristics and fight outcome
+- each row represents a match
 
-# Cool things to try
-- find cluster according to weight categories and time
-- create a dynamic ranking of fighters based on strength of their opponents
+# Techniques used
+GNN, GCNN, Gephi, networkx, PageRank, PyG
+
+# Cool things to do
+## Node level
+- [x] weight class prediction (classification)
+- [ ] predict wether a fighter has been a champion (bin. classification, imbalanced)
+- [ ] community detection
+- [ ] dynamic power ranking / temporal graph
+
+## Edge level
+- [ ] predict outcome of matches given all preceding fights
 
 # Visualisation
 
 ![Alt text](images/mmagraph_github.png)
 
-On the picture above, the size of the node reflects the number of bouts a fighter has participated in. The C shape obtained with Force Atlas is a manifestation of some fighters fighting in different categories hence through attraction making the whole structure fold a bit. You can see some of these fighter if you look carefully. The network of women is logically disconnected from the men's.
+On the picture above, the size of the node reflects the number of bouts a fighter has participated in. The C shape obtained with Force Atlas is a manifestation of some fighters fighting in different categories hence through attraction making the whole structure fold a bit. You can see some of these cross weight categories fighter if you look carefully. The network of women is logically disconnected from the men's.
