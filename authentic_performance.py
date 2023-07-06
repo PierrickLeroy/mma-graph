@@ -79,8 +79,55 @@ def generate_fraudstersEdges(G, n, strengths, fraud_probability=0.5):
         G.add_edges_from(fraudulous_links, fraudulous=True)
         G.add_edges_from(regular_links, fraudulous=False)
 
-def generate_network(n, p, distribution=uniform, fraud=True, fraudster_index=None, fraudster_strength=None, fraud_probability=None,
-                     strength_scheme=False, iterations=1000, decreasing_function=lambda x : 1/x):
+def generate_fraudstersEdges_2(G, n, network_strength_scheme,
+                               fraud_probability=0.5, fraud_scheme=None, decreasing_function=lambda x : 1/x):
+    """Generates a list of fraudulous edges and regular edges for fraudsters in the network
+
+    Args:
+        G (nx.Graph): _description_
+        n (int): _description_
+        strengths (float array): _description_
+        fraud_probability (float, optional): _description_. Defaults to 0.5.
+    """
+    strengths = np.array(list(nx.get_node_attributes(G,"strength").values()))
+    list_fraudsters = [x for x, y in G.nodes(data=True) if y["fraud"]]
+    for f in list_fraudsters:
+        f_strength = G.nodes[f]["strength"]
+        f_degree = G.degree[f]
+        G.remove_node(f)
+        G.add_node(f, strength=f_strength, fraud=True)
+        n_fraudulous_links = round(f_degree*fraud_probability)
+        n_regular_links = f_degree - n_fraudulous_links
+        if fraud_scheme=="strength":
+            p = decreasing_function(np.arange(f-1)+1)
+            easy_win_neighbours = np.random.choice((np.arange(f-1)+1)[::-1],
+                                                   p=p/p.sum(),
+                                                   size=10, replace=False)
+        else:
+            easy_win_neighbours = np.random.choice((np.nonzero(strengths<f_strength))[0], n_fraudulous_links, replace=False)
+
+        if network_strength_scheme:
+            regular_neighbours = choose_newNeighbour(G, f, decreasing_function, size=n_regular_links)
+        else:
+            regular_neighbours = np.random.choice(np.nonzero(~np.isin(np.array(range(n)), np.append(easy_win_neighbours, f)))[0], n_regular_links, replace=False)
+
+        fraudulous_links = [(source, f) for source in easy_win_neighbours]
+        regular_links = list(zip(np.where(strengths[regular_neighbours]>f_strength, f, regular_neighbours),
+                 np.where(strengths[regular_neighbours]>f_strength, regular_neighbours, f)))
+        G.add_edges_from(fraudulous_links, fraudulous=True)
+        G.add_edges_from(regular_links, fraudulous=False)
+
+def generate_network(n,
+                     p,
+                     distribution=uniform,
+                     fraud=True,
+                     fraudster_index=None,
+                     fraudster_strength=None,
+                     fraud_probability=None,
+                     strength_scheme=False,
+                     iterations=1000,
+                     decreasing_function=lambda x : 1/x,
+                     fraud_scheme=None):
     """Generates a network with a fraudster inside it.
 
     Args:
@@ -100,13 +147,15 @@ def generate_network(n, p, distribution=uniform, fraud=True, fraudster_index=Non
         fraud_probability = uniform.rvs()
     strengths = np.sort(distribution.rvs(size=n))
     G = generate_nodes(strengths)
-    G.add_edges_from(generate_edges(n, p, strengths))
+    G.add_edges_from(generate_edges(n, p, strengths), fraudulous=False)
     if strength_scheme:
         rewire_strengthScheme(G, iterations=iterations,
                               decreasing_function=decreasing_function, verbose=False)
     if fraud:
         specify_fraudster(G, index=fraudster_index, strength=fraudster_strength)
-        generate_fraudstersEdges(G, n, strengths, fraud_probability=fraud_probability)
+        # generate_fraudstersEdges(G, n, strengths, fraud_probability=fraud_probability)
+        generate_fraudstersEdges_2(G, n, network_strength_scheme=strength_scheme,
+                               fraud_probability=fraud_probability, fraud_scheme=fraud_scheme, decreasing_function=decreasing_function)
     return G
 
 
@@ -119,7 +168,7 @@ def remove_randomEdge(G, node):
     G.remove_edge(*random_edge)
     return random_edge
 
-def choose_newNeighbour(G, node, decreasing_function):
+def choose_newNeighbour(G, node, decreasing_function, size=1):
     neighbours = list(G.to_undirected().neighbors(node))
     not_neighbours = [v for v in G.nodes if v not in neighbours + [node]]
     s_strengths = pd.Series(
@@ -128,17 +177,17 @@ def choose_newNeighbour(G, node, decreasing_function):
     node_strength = G.nodes[node]["strength"]
     list_ordered_nodes = s_strengths.index[np.argsort(np.abs(s_strengths.values - node_strength))]
     weights = decreasing_function(np.arange(len(list_ordered_nodes)) + 1)
-    return np.random.choice(list_ordered_nodes, p=weights/weights.sum())  # return new neighbour
+    return np.random.choice(list_ordered_nodes, p=weights/weights.sum(), size=size, replace=False)  # return new neighbour
 
 def add_newNeighbour(G, node, new_neighbour):
     if node > new_neighbour:
         if G.has_edge(new_neighbour, node):
             raise ValueError(f"Edge {new_neighbour, node} already exists")
-        G.add_edge(new_neighbour, node)
+        G.add_edge(new_neighbour, node, fraudulous=False)
     else:
         if G.has_edge(node, new_neighbour):
             raise ValueError(f"Edge {node, new_neighbour} already exists")
-        G.add_edge(node, new_neighbour)
+        G.add_edge(node, new_neighbour, fraudulous=False)
 
 def rewire_strengthScheme(G, iterations=1000, decreasing_function=lambda x : 1/x, verbose=False):
     n_edges = len(G.edges)
@@ -151,7 +200,7 @@ def rewire_strengthScheme(G, iterations=1000, decreasing_function=lambda x : 1/x
             continue
         if verbose:
             print(f"Random edge dropped: {random_edge}")
-        new_neighbour = choose_newNeighbour(G, random_node, decreasing_function)
+        new_neighbour = choose_newNeighbour(G, random_node, decreasing_function)[0]
         if verbose:
             print(f"New neighbour: {new_neighbour}")
         add_newNeighbour(G, random_node, new_neighbour)
