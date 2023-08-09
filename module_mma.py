@@ -1,4 +1,4 @@
-"""Simple module to work with mma-graph project"""
+"""[OUTDATED] [KEPT FOR LEGACY] Simple module to work with mma-graph project"""
 
 import pandas as pd
 import networkx as nx
