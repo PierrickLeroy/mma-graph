@@ -40,8 +40,8 @@ def generate_edges(n, p, strengths):
     Args:
         n (int): _description_
         p (float): probability of a random link (undirected)
-        strengths (float array): relative strength between a source and target node sets direction of edge
-            Direction always goes from weakest to strongest node. 
+        strengths (float array): array of strengths of each node.
+            Edge direction always goes from weakest to strongest node. 
 
     Returns:
         array: array of edges
