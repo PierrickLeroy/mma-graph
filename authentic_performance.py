@@ -6,6 +6,12 @@ import numpy as np
 import pandas as pd
 import torch
 
+### ====================================================================
+### ====================================================================
+### Network generation
+### ====================================================================
+### ====================================================================
+
 def generate_nodes(strengths):
     """generates n nodes from a strength vector of n values 
 
@@ -141,7 +147,6 @@ def generate_network(n,
                                fraud_scheme=fraud_scheme,
                                decreasing_function=decreasing_function)
     return G
-
 
 def remove_randomEdge(G, node):
     """Removes a random edge from a node"""
@@ -310,3 +315,39 @@ class WinLossDraw(torch.nn.Module):
         w, l, d = x[:,0], x[:,1], x[:,2]
         h = (w - self.alpha*l +.5*d - 0.5*self.alpha*d)/(w+l+d+self.t)
         return torch.nn.Sigmoid()(h)
+
+### ====================================================================
+### ====================================================================
+### Credible pagerank
+### ====================================================================
+### ====================================================================
+
+def compute_judgesCredibility(G, v1, v2, ego=0., credibility_damping_factor=0.85):
+    if G.is_directed():
+        raise ValueError("Graph must be undirected")
+    G1, G2 = G.copy(), G.copy()
+    G1.remove_node(v2)
+    G2.remove_node(v1)
+    pr1 = nx.pagerank(G1, personalization={v1: 1}, alpha=credibility_damping_factor, max_iter=10000)
+    pr2 = nx.pagerank(G2, personalization={v2: 1}, alpha=credibility_damping_factor, max_iter=10000)
+    pr1.pop(v1)
+    pr2.pop(v2)
+    df = pd.concat((pd.Series(pr1, name=1), pd.Series(pr2, name=2)), axis=1)
+    df["credibility"] = df.product(axis=1)
+    df["credibility"] = df["credibility"]/(df["credibility"].max())
+    max_credibility = df["credibility"].max()
+    df.loc[v1, [1, "credibility"]] = ego * max_credibility
+    df.loc[v1, 2] = 0.
+    df.loc[v2, [2, "credibility"]] = ego * max_credibility
+    df.loc[v2, 1] = 0.
+    return df.sort_index()
+
+def vote_credible(G, v1, v2, dict_credibility, voting_damping_factor=0.85):
+    pr = nx.pagerank(G, personalization=dict_credibility, alpha=voting_damping_factor)
+    return pr[v1], pr[v2]
+
+def pagerank_credible(G, v1, v2, ego=0., credibility_damping_factor=0.85, voting_damping_factor=0.85):
+    G_undirected = G.to_undirected()
+    df = compute_judgesCredibility(G_undirected, v1, v2, ego=ego, credibility_damping_factor=credibility_damping_factor)
+    d = dict(df['credibility'])
+    return vote_credible(G, v1, v2, d, voting_damping_factor=voting_damping_factor)
