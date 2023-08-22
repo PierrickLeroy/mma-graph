@@ -301,7 +301,7 @@ def generate_trainingData(generate_network_function, n=10):
         df = convert_graphToDataFrame(G)
         l_df.append(df)
     df = pd.concat(l_df)
-    return torch.from_numpy(df[["wins","losses","draws"]].values).float(), torch.from_numpy(df["strength"].values).float()  # pylint: disable=no-member
+    return torch.from_numpy(df[["wins","losses","draws"]].values).float(), torch.from_numpy(df["strength"].values).float()  # pylint: disable=no-member, line-too-long
 
 class WinLossDraw(torch.nn.Module):
     """Rating function based on win/loss/draw informations"""
@@ -323,6 +323,22 @@ class WinLossDraw(torch.nn.Module):
 ### ====================================================================
 
 def compute_judgesCredibility(G, v1, v2, ego=0., credibility_damping_factor=0.85):
+    """Compute credibibility of each node in G to rate v1 and v2.
+
+    Args:
+        G (nx.Graph): Undirected graph
+        v1 (node name): a node in G
+        v2 (node name): another node in G
+        ego (float, optional): The higher the ego, the more direct confrontation are valued. Defaults to 0..
+        credibility_damping_factor (float, optional): damping factor for PR. Defaults to 0.85.
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        DataFrame: a dataframe with the normalised credibility of each node
+            and the marginal credibilities of v1 and v2.
+    """
     if G.is_directed():
         raise ValueError("Graph must be undirected")
     G1, G2 = G.copy(), G.copy()
@@ -333,7 +349,7 @@ def compute_judgesCredibility(G, v1, v2, ego=0., credibility_damping_factor=0.85
     pr1.pop(v1)
     pr2.pop(v2)
     df = pd.concat((pd.Series(pr1, name=1), pd.Series(pr2, name=2)), axis=1)
-    df["credibility"] = df.product(axis=1)
+    df["credibility"] = df.product(axis=1)  # aggregation by pointwise multiplication
     df["credibility"] = df["credibility"]/(df["credibility"].max())
     max_credibility = df["credibility"].max()
     df.loc[v1, [1, "credibility"]] = ego * max_credibility
@@ -342,12 +358,52 @@ def compute_judgesCredibility(G, v1, v2, ego=0., credibility_damping_factor=0.85
     df.loc[v2, 1] = 0.
     return df.sort_index()
 
-def vote_credible(G, v1, v2, dict_credibility, voting_damping_factor=0.85):
-    pr = nx.pagerank(G, personalization=dict_credibility, alpha=voting_damping_factor)
+def __vote_credible(G, v1, v2, dict_credibility, voting_damping_factor=0.85):
+    """Returns the credible pagerank of v1 and v2"""
+    pr = nx.pagerank(G, personalization=dict_credibility,
+                     alpha=voting_damping_factor)
     return pr[v1], pr[v2]
 
 def pagerank_credible(G, v1, v2, ego=0., credibility_damping_factor=0.85, voting_damping_factor=0.85):
+    """Computes the credible pagerank of v1 and v2 in G"""
     G_undirected = G.to_undirected()
-    df = compute_judgesCredibility(G_undirected, v1, v2, ego=ego, credibility_damping_factor=credibility_damping_factor)
+    df = compute_judgesCredibility(G_undirected, v1, v2, ego=ego,
+                                   credibility_damping_factor=credibility_damping_factor)
     d = dict(df['credibility'])
-    return vote_credible(G, v1, v2, d, voting_damping_factor=voting_damping_factor)
+    return __vote_credible(G, v1, v2, d, voting_damping_factor=voting_damping_factor)
+
+def get_closestRankedNodes(idx, N, k):
+    """Returns closest ranked nodes to idx in a window of size k
+    within a list of length N
+
+    Args:
+        idx (int): index of central node
+        N (int): length of list
+        k (even int): window size
+
+    Raises:
+        ValueError: _description_
+
+    Returns:
+        list: index of neighbours
+    """
+    if k%2 != 0:
+        raise ValueError("k must be even")
+    if idx - k/2 < 0:
+        return list(range(idx)) + list(range(idx+1,idx + int(k/2) + 1 + abs(idx - int(k/2))))
+    if idx + k/2 > N-1 :
+        return list(range(idx - int(k/2)- abs(idx + int(k/2) - N + 1),idx)) + list(range(idx+1,N))
+    return list(range(idx - int(k/2),idx)) + list(range(idx+1,idx + int(k/2) + 1))
+
+def score_fraud(G, ranking, window_size, node):
+    """Returns the fraud score of a node in a ranking,
+    where the node is in the directed network G"""
+    rank_fraudster = np.nonzero(ranking==node)[0][0]
+    fraudster_rank_neighboorhood = ranking[get_closestRankedNodes(rank_fraudster,
+                                                                  len(ranking),
+                                                                  window_size)]
+    l = []
+    for neighbor in fraudster_rank_neighboorhood:
+        x_fraudster, x_neighbor = pagerank_credible(G, node, neighbor)
+        l.append((x_fraudster<x_neighbor))
+    return np.array(l).mean()
