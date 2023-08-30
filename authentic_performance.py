@@ -237,6 +237,11 @@ def kendall_tauDistance(p1,p2):
     p2_inv = p2_inv[p1]
     return sum((p2_inv[i]>p2_inv[i+1:]).sum() for i in range(len(p2_inv)-1))
 
+def argsort_robust(a):
+    """Unbiased argsort function that randomly places ahead elements with same value"""
+    p = np.random.permutation(len(a))
+    return np.arange(len(a))[p][np.argsort(a[p])]
+
 ### ====================================================================
 ### ====================================================================
 ### Rating functions and utils of rating functions
