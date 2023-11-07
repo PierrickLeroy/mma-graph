@@ -202,6 +202,44 @@ def rewire_strengthScheme(G, iterations=1000, decreasing_function=lambda x : 1/x
         if len(G.edges)!=n_edges:
             raise ValueError("Number of edges changed")
 
+def generate_degreeSequenceUFCFitted(N):
+    """Generates a degree sequence that can be used by a configuration model
+    Parameters are fitted on UFC data and hard coded at the beginning of the function"""
+    k_min = 1
+    k_max = 36
+    k_sat = 7
+    k_cut = 13
+    gamma = 1.8
+    degree_sequence = np.ones(1)
+    while degree_sequence.sum()%2 != 0:
+        a = (np.arange(k_min, k_max+1)+k_sat)**(-gamma)*np.exp(-np.arange(k_min, k_max+1)/k_cut)
+        p_k = a / a.sum()
+        degree_sequence = np.random.choice(np.arange(k_min, k_max+1), p=p_k, size=N)
+    return degree_sequence
+
+def generate_fittedUFCNetwork(N, alpha):
+    """Generates a network of N nodes with degree distribution fitted on UFC data
+
+    Args:
+        N (int): number of nodes
+        alpha (float): the lowest, the more likely the highest degree node will be the strongest
+
+    Returns:
+        _type_: _description_
+    """
+    degree_sequence = generate_degreeSequenceUFCFitted(N)
+    G = nx.Graph(nx.configuration_model(degree_sequence))
+    a = np.array(list(dict(G.degree()).values()))
+    eps = np.random.normal(size=N)
+    d_strengths = dict(zip(np.argsort(a*(1+eps*alpha)), np.arange(N)))
+    G = G.to_directed()
+    l = list(G.edges())
+    for v1, v2 in l:
+        if d_strengths[v1] > d_strengths[v2] or v1==v2:
+            G.remove_edge(v1, v2)
+    G = nx.relabel_nodes(G, d_strengths, copy=True)
+    return G
+
 ### ====================================================================
 ### ====================================================================
 ### Permutation distances
@@ -369,7 +407,8 @@ def __vote_credible(G, v1, v2, dict_credibility, voting_damping_factor=0.85):
                      alpha=voting_damping_factor)
     return pr[v1], pr[v2]
 
-def pagerank_credible(G, v1, v2, ego=0., credibility_damping_factor=0.85, voting_damping_factor=0.85):
+def pagerank_credible(G, v1, v2, ego=0., credibility_damping_factor=0.85
+                      , voting_damping_factor=0.85):
     """Computes the credible pagerank of v1 and v2 in G"""
     G_undirected = G.to_undirected()
     df = compute_judgesCredibility(G_undirected, v1, v2, ego=ego,
