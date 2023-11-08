@@ -319,10 +319,11 @@ def convert_graphToDataFrame(G):
     Specific to f_alpha_t rating function."""
     df = pd.DataFrame([x[1] for x in list(G.nodes(data=True))])
     s = pd.Series([x[0] for x in list(G.nodes(data=True))], name="node")
-    df = pd.concat([df, s,
+    df = pd.concat([df, s], axis=1).set_index("node")
+    df = pd.concat([df,
             pd.Series(dict(G.in_degree()), name="wins"),
             pd.Series(dict(G.out_degree()), name="losses")],
-            axis=1)
+            axis=1).sort_index()
     df["draws"] = 0
     return df
 
